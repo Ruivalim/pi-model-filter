@@ -43,6 +43,9 @@ export class SubmenuController {
   // Current mode
   public mode: SubmenuMode = null;
 
+  // Type-to-filter query (SelectList does not handle typing itself)
+  private filterText = "";
+
   constructor(theme: SubmenuTheme) {
     this.theme = theme;
   }
@@ -53,19 +56,21 @@ export class SubmenuController {
     onSelect: (item: SelectItem) => void,
     onClose?: () => void,
     maxVisible?: number,
+    initialIndex?: number,
   ): void {
     this.close();
     this.mode = "provider"; // caller should set mode after
     this.onSelectSingle = onSelect;
     this.onApplyMulti = null;
     this.onClose = onClose ?? null;
-    this.selectedIndex = 0;
+    this.selectedIndex = initialIndex ?? 0;
 
     this.selectList = new SelectList(
       items,
       Math.min(items.length, maxVisible ?? 10),
       this.theme,
     );
+    if (initialIndex) this.selectList.setSelectedIndex(initialIndex);
     this.selectList.onSelect = (item) => {
       onSelect(item);
       this.close();
@@ -142,6 +147,7 @@ export class SubmenuController {
     this.selectList = null;
     this.onSelectSingle = null;
     this.onApplyMulti = null;
+    this.filterText = "";
     const cb = this.onClose;
     this.onClose = null;
     this.mode = null;
@@ -153,6 +159,7 @@ export class SubmenuController {
     this.selectList = null;
     this.onSelectSingle = null;
     this.onApplyMulti = null;
+    this.filterText = "";
     this.mode = null;
     this.onClose?.();
     this.onClose = null;
@@ -166,6 +173,7 @@ export class SubmenuController {
     this.selectList = null;
     this.onSelectSingle = null;
     this.onApplyMulti = null;
+    this.filterText = "";
     this.mode = null;
     this.onClose?.();
     this.onClose = null;
@@ -174,7 +182,9 @@ export class SubmenuController {
   /** Render the submenu. Returns lines or null if no submenu is open. */
   render(width: number): string[] | null {
     if (!this.selectList) return null;
-    return this.selectList.render(width);
+    const lines = this.selectList.render(width);
+    if (this.filterText) lines.unshift(this.theme.scrollInfo(`filter: ${this.filterText}`));
+    return lines;
   }
 
   /**
@@ -184,6 +194,20 @@ export class SubmenuController {
    */
   handleInput(data: string): boolean {
     if (!this.selectList) return false;
+
+    // Type-to-filter: printable chars extend the query, backspace shrinks it.
+    if (data === "\x7f" || data === "\b") {
+      if (this.filterText) {
+        this.filterText = this.filterText.slice(0, -1);
+        this.selectList.setFilter(this.filterText);
+      }
+      return true;
+    }
+    if (data.length === 1 && data >= " ") {
+      this.filterText += data;
+      this.selectList.setFilter(this.filterText);
+      return true;
+    }
 
     // Track position before input
     const sel = this.selectList.getSelectedItem?.();

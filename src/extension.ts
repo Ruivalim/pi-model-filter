@@ -9,6 +9,7 @@ import {
 } from "./config.js";
 import { patchModelRegistryPrototype } from "./patch.js";
 import { buildModelFilterMenu } from "./menu.js";
+import { buildFilteredModelPicker } from "./model-picker.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -122,6 +123,36 @@ export default function piModelFilter(pi: any) {
         }),
       );
     },
+  });
+
+  // /filtered-models (/fmodels): switch among models that survive the
+  // filter. pi's built-in /models reads a cached ModelRuntime snapshot and
+  // ignores the registry patch, so blocked models still show up there.
+  const openFilteredModels = async (_args: string, ctx: any) => {
+    try {
+      const models = ctx.modelRegistry?.getAvailable?.() ?? [];
+      await ctx.ui.custom(
+        buildFilteredModelPicker({
+          models,
+          current: ctx.model ?? null,
+          onPick: (m) => {
+            void pi.setModel(m).then((ok: boolean) => {
+              if (!ok) ctx.ui?.notify?.("No API key for this model", "error");
+            });
+          },
+        }),
+      );
+    } catch (e) {
+      factoryLog.warn(`filtered-models failed: ${String(e)}`);
+    }
+  };
+  pi.registerCommand("filtered-models", {
+    description: "Switch model (filtered by pi-model-filter)",
+    handler: openFilteredModels,
+  });
+  pi.registerCommand("fmodels", {
+    description: "Alias for /filtered-models",
+    handler: openFilteredModels,
   });
 
   pi.on("session_start", (_event: unknown, ctx: unknown) => {

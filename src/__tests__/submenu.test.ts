@@ -43,4 +43,27 @@ describe("SubmenuController", () => {
     expect(onApply).toHaveBeenCalledWith(["a"]);
     expect(sub.isOpen).toBe(false);
   });
+
+  it("type-to-filter narrows the list and backspace restores", () => {
+    const sub = new SubmenuController(theme);
+    sub.openSingleSelect(
+      [
+        { value: "gpt-5.6", label: "gpt-5.6" },
+        { value: "claude-fable-5", label: "claude-fable-5" },
+      ],
+      vi.fn(),
+    );
+
+    for (const ch of "gpt") sub.handleInput(ch);
+    let rendered = sub.render(60)!.join("\n");
+    expect(rendered).toContain("gpt-5.6");
+    expect(rendered).not.toContain("claude-fable-5");
+    expect(rendered).toContain("filter: gpt");
+
+    sub.handleInput("\x7f"); // backspace -> "gp"
+    sub.handleInput("\x7f");
+    sub.handleInput("\x7f"); // empty again
+    rendered = sub.render(60)!.join("\n");
+    expect(rendered).toContain("claude-fable-5");
+  });
 });
