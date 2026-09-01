@@ -79,28 +79,33 @@ export default function piModelFilter(pi: any) {
   pi.registerCommand("model-filter", {
     description: "Open the model filter menu",
     handler: async (_args: string, ctx: any) => {
-      // Derive provider and model lists from the registry
-      const getProviders = (): string[] => {
+      // Menu lists the RAW catalogue (unpatched originals), otherwise models
+      // already blocked by a rule would be impossible to pick for new rules.
+      const rawModels = (): any[] => {
         try {
-          const models = ctx.modelRegistry?.getAvailable?.() ?? [];
-          return [...new Set(models.map((m: any) => m.provider as string))] as string[];
+          const reg = ctx.modelRegistry;
+          if (patch.originals) {
+            const all = patch.originals.getAll.call(reg);
+            if (Array.isArray(all)) return all;
+          }
+          return reg?.getAvailable?.() ?? [];
         } catch {
           return [];
         }
       };
 
+      const getProviders = (): string[] => {
+        return [...new Set(rawModels().map((m: any) => m.provider as string))];
+      };
+
       const getModelsForProvider = (provider: string): string[] => {
-        try {
-          const models = ctx.modelRegistry?.getAvailable?.() ?? [];
-          if (provider === "*") {
-            return [...new Set(models.map((m: any) => m.id as string))] as string[];
-          }
-          return models
-            .filter((m: any) => m.provider === provider)
-            .map((m: any) => m.id as string);
-        } catch {
-          return [];
+        const models = rawModels();
+        if (provider === "*") {
+          return [...new Set(models.map((m: any) => m.id as string))];
         }
+        return models
+          .filter((m: any) => m.provider === provider)
+          .map((m: any) => m.id as string);
       };
 
       await ctx.ui.custom(
