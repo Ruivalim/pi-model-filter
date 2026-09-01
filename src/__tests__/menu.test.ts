@@ -357,6 +357,37 @@ describe("model-filter menu", () => {
     });
   });
 
+  describe("ids submenu", () => {
+    it("lists only the rule provider's models", () => {
+      const m = mount({ config: sampleConfig });
+      m.input(KEYS.right); // enter rules
+      m.input(KEYS.right); // enter detail (rule 1: github-copilot)
+      m.input(KEYS.enter); // edit
+      m.input(KEYS.down); // action
+      m.input(KEYS.down); // match ids
+      m.input(KEYS.enter); // open ids submenu
+
+      const lines = m.render();
+      expect(lines.some((l) => l.includes("claude-opus-4.6"))).toBe(true);
+      expect(lines.some((l) => l.includes("gpt-5.5"))).toBe(false); // openai only
+      expect(lines.some((l) => l.includes("claude-sonnet-4"))).toBe(false); // anthropic only
+    });
+
+    it("refuses to open when provider is '*'", () => {
+      const m = mount({ config: sampleConfig });
+      m.input(KEYS.right); // enter rules
+      m.input(KEYS.down); // rule 2
+      m.input(KEYS.down); // rule 3 (provider '*')
+      m.input(KEYS.right); // detail
+      m.input(KEYS.enter); // edit
+      m.input(KEYS.down);
+      m.input(KEYS.down); // match ids
+      m.input(KEYS.enter); // try to open ids submenu
+
+      expect(m.error()).toMatch(/provider/i);
+    });
+  });
+
   describe("config path", () => {
     it("shows custom config path", () => {
       const m = mount({
