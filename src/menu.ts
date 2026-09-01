@@ -902,6 +902,15 @@ export function buildModelFilterMenu(opts: MenuOptions) {
         editingRule.match.reasoning !== undefined;
 
       if (!hasMatch) {
+        if (state.editingNew) {
+          // Esc on a blank new rule = cancel, no way to save an invalid rule
+          editingRule = null;
+          state.mode = "rules";
+          state.editFieldIndex = 0;
+          error = null;
+          refresh();
+          return;
+        }
         showError("Rule must have at least one match field");
         return;
       }
