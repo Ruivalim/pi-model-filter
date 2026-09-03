@@ -357,6 +357,45 @@ describe("model-filter menu", () => {
     });
   });
 
+  describe("new rule cancel", () => {
+    it("Esc on a blank new rule discards it and goes back", () => {
+      const m = mount({ config: sampleConfig });
+      m.input(KEYS.right); // enter rules
+      m.input(KEYS.down);
+      m.input(KEYS.down);
+      m.input(KEYS.down); // [+] add rule
+      m.input(KEYS.enter); // new blank rule
+
+      expect(m.state().mode).toBe("edit");
+      m.input(KEYS.escape);
+
+      expect(m.state().mode).toBe("rules");
+      expect(m.store.current().rules).toHaveLength(3); // nothing added
+    });
+
+    it("Esc with a match field set still saves the new rule", () => {
+      const m = mount({ config: sampleConfig });
+      m.input(KEYS.right);
+      m.input(KEYS.down);
+      m.input(KEYS.down);
+      m.input(KEYS.down);
+      m.input(KEYS.enter); // new blank rule
+
+      // set reasoning (field 4): either -> true
+      m.input(KEYS.down);
+      m.input(KEYS.down);
+      m.input(KEYS.down);
+      m.input(KEYS.down);
+      m.input(KEYS.enter); // open reasoning submenu
+      m.input(KEYS.down); // true
+      m.input(KEYS.enter); // select
+      m.input(KEYS.escape); // save and back
+
+      expect(m.state().mode).toBe("rules");
+      expect(m.store.current().rules).toHaveLength(4);
+    });
+  });
+  
   describe("ids submenu", () => {
     it("lists only the rule provider's models", () => {
       const m = mount({ config: sampleConfig });
