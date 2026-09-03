@@ -590,10 +590,13 @@ export function buildModelFilterMenu(opts: MenuOptions) {
         );
       } else if (type === "ids") {
         const provider = editingRule?.provider ?? "*";
-        const models =
-          provider === "*"
-            ? opts.getModelsForProvider("*")
-            : opts.getModelsForProvider(provider);
+        if (provider === "*") {
+          showError("Pick a provider first: Match IDs lists only that provider's models");
+          state.submenu = null;
+          refresh();
+          return;
+        }
+        const models = opts.getModelsForProvider(provider);
         const items = models.map((id) => ({ value: id, label: id }));
         const selected = new Set(editingRule?.match.ids ?? []);
         submenu.openMultiSelect(
