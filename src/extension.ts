@@ -9,6 +9,7 @@ import {
 } from "./config.js";
 import { patchModelRegistryPrototype } from "./patch.js";
 import { buildModelFilterMenu } from "./menu.js";
+import { buildFilteredModelPicker } from "./model-picker.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -79,28 +80,33 @@ export default function piModelFilter(pi: any) {
   pi.registerCommand("model-filter", {
     description: "Open the model filter menu",
     handler: async (_args: string, ctx: any) => {
-      // Derive provider and model lists from the registry
-      const getProviders = (): string[] => {
+      // Menu lists the RAW catalogue (unpatched originals), otherwise models
+      // already blocked by a rule would be impossible to pick for new rules.
+      const rawModels = (): any[] => {
         try {
-          const models = ctx.modelRegistry?.getAvailable?.() ?? [];
-          return [...new Set(models.map((m: any) => m.provider as string))] as string[];
+          const reg = ctx.modelRegistry;
+          if (patch.originals) {
+            const all = patch.originals.getAll.call(reg);
+            if (Array.isArray(all)) return all;
+          }
+          return reg?.getAvailable?.() ?? [];
         } catch {
           return [];
         }
       };
 
+      const getProviders = (): string[] => {
+        return [...new Set(rawModels().map((m: any) => m.provider as string))];
+      };
+
       const getModelsForProvider = (provider: string): string[] => {
-        try {
-          const models = ctx.modelRegistry?.getAvailable?.() ?? [];
-          if (provider === "*") {
-            return [...new Set(models.map((m: any) => m.id as string))] as string[];
-          }
-          return models
-            .filter((m: any) => m.provider === provider)
-            .map((m: any) => m.id as string);
-        } catch {
-          return [];
+        const models = rawModels();
+        if (provider === "*") {
+          return [...new Set(models.map((m: any) => m.id as string))];
         }
+        return models
+          .filter((m: any) => m.provider === provider)
+          .map((m: any) => m.id as string);
       };
 
       await ctx.ui.custom(
@@ -117,6 +123,36 @@ export default function piModelFilter(pi: any) {
         }),
       );
     },
+  });
+
+  // /filtered-models (/fmodels): switch among models that survive the
+  // filter. pi's built-in /models reads a cached ModelRuntime snapshot and
+  // ignores the registry patch, so blocked models still show up there.
+  const openFilteredModels = async (_args: string, ctx: any) => {
+    try {
+      const models = ctx.modelRegistry?.getAvailable?.() ?? [];
+      await ctx.ui.custom(
+        buildFilteredModelPicker({
+          models,
+          current: ctx.model ?? null,
+          onPick: (m) => {
+            void pi.setModel(m).then((ok: boolean) => {
+              if (!ok) ctx.ui?.notify?.("No API key for this model", "error");
+            });
+          },
+        }),
+      );
+    } catch (e) {
+      factoryLog.warn(`filtered-models failed: ${String(e)}`);
+    }
+  };
+  pi.registerCommand("filtered-models", {
+    description: "Switch model (filtered by pi-model-filter)",
+    handler: openFilteredModels,
+  });
+  pi.registerCommand("fmodels", {
+    description: "Alias for /filtered-models",
+    handler: openFilteredModels,
   });
 
   pi.on("session_start", (_event: unknown, ctx: unknown) => {
