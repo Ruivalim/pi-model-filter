@@ -198,6 +198,9 @@ export class SubmenuController {
 
     this.selectList.handleInput(data);
 
+    // Enter/Esc callbacks may have closed the submenu (selectList = null)
+    if (!this.selectList) return true;
+
     // Update tracked index after input
     const newSel = this.selectList.getSelectedItem?.();
     if (newSel && this.mode === "ids") {
