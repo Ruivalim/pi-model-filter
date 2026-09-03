@@ -4,10 +4,12 @@ Filter and block models from any provider in pi via declarative allow/block rule
 
 Hide unwanted GitHub Copilot models, enforce global allowlists, block by reasoning capability or context window size — all through a simple JSON config.
 
+> Fork de [pi-model-filter](https://github.com/clankercode/pi-model-filter) com fixes e features que não foram aceitos upstream.
+
 ## Install
 
 ```bash
-pi install pi-model-filter
+pi install @ruivalim/pi-model-filter
 ```
 
 ## Configuration
