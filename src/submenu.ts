@@ -14,7 +14,56 @@
 //   // In render: submenu.render(width) → string[] | null
 //   // In handleInput: submenu.handleInput(data) → boolean (true = consumed)
 
-import { SelectList, type SelectItem } from "@earendil-works/pi-tui";
+import { SelectList, fuzzyMatch, type SelectItem } from "@earendil-works/pi-tui";
+
+/**
+ * Field weights: a fuzzy hit inside the label (the model id, what the user is
+ * usually typing) must beat one that only hit the provider or description.
+ * Without this, "opus" scored better against "anthropic/claude-sonnet" (the
+ * letters o,p,u clustering inside "anthropic/claude") than against the actual
+ * opus id.
+ */
+const FIELD_PENALTY = { label: 0, value: 25, description: 50 } as const;
+
+/**
+ * pi-tui's fuzzyFilter scores one concatenated string, so provider text can
+ * outscore the model id. Rank per token over separate weighted fields instead:
+ * a token takes its best field, and every token must match somewhere.
+ */
+function rankItems(items: SelectItem[], query: string): SelectItem[] {
+  const tokens = query.trim().split(/[\s/]+/).filter((t) => t.length > 0);
+  if (tokens.length === 0) return items;
+
+  const scored: { item: SelectItem; score: number }[] = [];
+  for (const item of items) {
+    const fields: { text: string; penalty: number }[] = [
+      { text: item.label || item.value, penalty: FIELD_PENALTY.label },
+      { text: item.value, penalty: FIELD_PENALTY.value },
+    ];
+    if (item.description) {
+      fields.push({ text: item.description, penalty: FIELD_PENALTY.description });
+    }
+
+    let score = 0;
+    let matchedAll = true;
+    for (const token of tokens) {
+      let best = Number.POSITIVE_INFINITY;
+      for (const field of fields) {
+        const match = fuzzyMatch(token, field.text);
+        if (match.matches) best = Math.min(best, match.score + field.penalty);
+      }
+      if (best === Number.POSITIVE_INFINITY) {
+        matchedAll = false;
+        break;
+      }
+      score += best;
+    }
+    if (matchedAll) scored.push({ item, score });
+  }
+
+  scored.sort((a, b) => a.score - b.score);
+  return scored.map((s) => s.item);
+}
 
 export type SubmenuMode = "provider" | "ids" | "reasoning" | "patterns" | null;
 
@@ -34,6 +83,12 @@ export class SubmenuController {
   // Multi-select state
   private multiSelected = new Set<string>();
   private multiItems: SelectItem[] = [];
+  private multiMaxVisible = 12;
+
+  // Single-select state (kept so the list can be rebuilt on filter change)
+  private singleItems: SelectItem[] = [];
+  private singleMaxVisible = 10;
+  private isMultiSelect = false;
 
   // Callbacks
   private onSelectSingle: ((item: SelectItem) => void) | null = null;
@@ -45,6 +100,28 @@ export class SubmenuController {
 
   // Type-to-filter query (SelectList does not handle typing itself)
   private filterText = "";
+
+  /**
+   * SelectList.setFilter only does a case-insensitive prefix match on value, so
+   * "sonnet" never finds "anthropic/claude-sonnet-4". We filter ourselves and
+   * rebuild the list with the survivors.
+   */
+  private filterItems(): SelectItem[] {
+    const source = this.isMultiSelect ? this.multiItems : this.singleItems;
+    return rankItems(source, this.filterText);
+  }
+
+  /** Re-apply the filter, keeping the highlighted item when it survives. */
+  private applyFilter(next: string): void {
+    const prevValue = this.selectList?.getSelectedItem?.()?.value ?? null;
+    this.filterText = next;
+    if (this.isMultiSelect) this.buildMultiSelectList();
+    else this.buildSingleList();
+    if (prevValue !== null && this.selectList) {
+      const idx = this.filterItems().findIndex((i) => i.value === prevValue);
+      this.selectList.setSelectedIndex(idx >= 0 ? idx : 0);
+    }
+  }
 
   constructor(theme: SubmenuTheme) {
     this.theme = theme;
@@ -64,15 +141,23 @@ export class SubmenuController {
     this.onApplyMulti = null;
     this.onClose = onClose ?? null;
     this.selectedIndex = initialIndex ?? 0;
+    this.singleItems = items;
+    this.singleMaxVisible = maxVisible ?? 10;
+    this.isMultiSelect = false;
 
+    this.buildSingleList();
+  }
+
+  private buildSingleList(): void {
+    const items = this.filterItems();
     this.selectList = new SelectList(
       items,
-      Math.min(items.length, maxVisible ?? 10),
+      Math.min(items.length, this.singleMaxVisible),
       this.theme,
     );
-    if (initialIndex) this.selectList.setSelectedIndex(initialIndex);
+    this.selectList.setSelectedIndex(this.selectedIndex);
     this.selectList.onSelect = (item) => {
-      onSelect(item);
+      this.onSelectSingle?.(item);
       this.close();
     };
     this.selectList.onCancel = () => {
@@ -96,8 +181,10 @@ export class SubmenuController {
     this.selectedIndex = 0;
     this.multiSelected = new Set(initiallySelected);
     this.multiItems = items;
+    this.multiMaxVisible = maxVisible ?? 12;
+    this.isMultiSelect = true;
 
-    this.buildMultiSelectList(maxVisible);
+    this.buildMultiSelectList();
   }
 
   /** Update multi-select items (e.g. after provider change). Preserves selection. */
@@ -106,11 +193,12 @@ export class SubmenuController {
     maxVisible?: number,
   ): void {
     this.multiItems = items;
-    this.buildMultiSelectList(maxVisible);
+    if (maxVisible !== undefined) this.multiMaxVisible = maxVisible;
+    this.buildMultiSelectList();
   }
 
-  private buildMultiSelectList(maxVisible?: number): void {
-    const labeled = this.multiItems.map((item) => ({
+  private buildMultiSelectList(): void {
+    const labeled = this.filterItems().map((item) => ({
       value: item.value,
       label: `${this.multiSelected.has(item.value) ? "✓" : " "} ${item.label}`,
       description: item.description,
@@ -118,7 +206,7 @@ export class SubmenuController {
 
     this.selectList = new SelectList(
       labeled,
-      Math.min(labeled.length, maxVisible ?? 12),
+      Math.min(labeled.length, this.multiMaxVisible),
       this.theme,
     );
     this.selectList.setSelectedIndex(this.selectedIndex);
@@ -131,7 +219,7 @@ export class SubmenuController {
         this.multiSelected.add(item.value);
       }
       // Rebuild (SelectList has no setItems)
-      this.buildMultiSelectList(maxVisible);
+      this.buildMultiSelectList();
     };
 
     this.selectList.onCancel = () => {
@@ -148,6 +236,9 @@ export class SubmenuController {
     this.onSelectSingle = null;
     this.onApplyMulti = null;
     this.filterText = "";
+    this.singleItems = [];
+    this.multiItems = [];
+    this.isMultiSelect = false;
     const cb = this.onClose;
     this.onClose = null;
     this.mode = null;
@@ -160,6 +251,9 @@ export class SubmenuController {
     this.onSelectSingle = null;
     this.onApplyMulti = null;
     this.filterText = "";
+    this.singleItems = [];
+    this.multiItems = [];
+    this.isMultiSelect = false;
     this.mode = null;
     this.onClose?.();
     this.onClose = null;
@@ -174,6 +268,9 @@ export class SubmenuController {
     this.onSelectSingle = null;
     this.onApplyMulti = null;
     this.filterText = "";
+    this.singleItems = [];
+    this.multiItems = [];
+    this.isMultiSelect = false;
     this.mode = null;
     this.onClose?.();
     this.onClose = null;
@@ -198,14 +295,12 @@ export class SubmenuController {
     // Type-to-filter: printable chars extend the query, backspace shrinks it.
     if (data === "\x7f" || data === "\b") {
       if (this.filterText) {
-        this.filterText = this.filterText.slice(0, -1);
-        this.selectList.setFilter(this.filterText);
+        this.applyFilter(this.filterText.slice(0, -1));
       }
       return true;
     }
     if (data.length === 1 && data >= " ") {
-      this.filterText += data;
-      this.selectList.setFilter(this.filterText);
+      this.applyFilter(this.filterText + data);
       return true;
     }
 
@@ -227,7 +322,7 @@ export class SubmenuController {
 
     // Update tracked index after input
     const newSel = this.selectList.getSelectedItem?.();
-    if (newSel && this.mode === "ids") {
+    if (newSel && this.isMultiSelect) {
       const idx = this.multiItems.findIndex((i) => i.value === newSel.value);
       if (idx >= 0) this.selectedIndex = idx;
     }
