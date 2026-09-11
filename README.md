@@ -136,3 +136,8 @@ git push origin main
 make pack                    # optional: inspect the tarball
 make publish                 # prepublishOnly runs typecheck, test and build
 ```
+
+Publishing needs a live npm session. `make whoami` tells you which case you
+are in: if it answers with your username, `make publish` is enough and the
+browser that pops up is the 2FA prompt; if it fails with E401, run
+`make login` first.

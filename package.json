@@ -6,11 +6,11 @@
   "license": "Unlicense",
   "repository": {
     "type": "git",
-    "url": "https://git.ruivalim.com.br/ruivalim/pi-model-filter.git"
+    "url": "https://github.com/Ruivalim/pi-model-filter.git"
   },
   "homepage": "https://www.npmjs.com/package/@ruivalim/pi-model-filter",
   "bugs": {
-    "url": "https://git.ruivalim.com.br/ruivalim/pi-model-filter/issues"
+    "url": "https://github.com/Ruivalim/pi-model-filter/issues"
   },
   "keywords": [
     "pi-package",

@@ -78,6 +78,16 @@ clean: ## Remove dist/ e os caches locais
 
 ##@ Release
 
+.PHONY: whoami
+whoami: ## Mostra quem está autenticado no npm (E401 = sessão morta)
+	@echo "$(GREEN)▸ whoami$(RESET)"
+	npm whoami
+
+.PHONY: login
+login: ## Autentica no npm pelo navegador (auth-type=web)
+	@echo "$(GREEN)▸ login$(RESET)"
+	npm login --auth-type=web
+
 .PHONY: version
 version: ## Faz o bump (VERSION=0.1.4), sem commitar nem taguear
 	@test -n "$(VERSION)" || { echo "$(YELLOW)uso: make version VERSION=x.y.z$(RESET)"; exit 1; }
