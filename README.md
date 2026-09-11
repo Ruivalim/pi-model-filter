@@ -113,3 +113,26 @@ The extension patches `ModelRegistry.prototype` at load time (before startup mod
 - **pi internals change**: extension detects missing methods and disables itself with a warning.
 - **Hot reload**: editing `model-filter.json` takes effect without restarting pi.
 
+
+## Development
+
+Every command goes through the Makefile. `make` (or `make help`) lists the targets.
+
+```bash
+make setup      # npm ci
+make test       # vitest
+make lint       # tsc --noEmit (no linter in this project)
+make check      # lint + test + build, exactly what CI runs
+make build      # tsc -p tsconfig.json -> dist/
+make clean      # remove dist/ and local caches
+```
+
+Cutting a release:
+
+```bash
+make version VERSION=0.1.4   # bump package.json + lock, no commit, no tag
+git commit -am "release: v0.1.4"
+git push origin main
+make pack                    # optional: inspect the tarball
+make publish                 # prepublishOnly runs typecheck, test and build
+```
