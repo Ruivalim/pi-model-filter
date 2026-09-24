@@ -4,8 +4,6 @@ Filter and block models from any provider in pi via declarative allow/block rule
 
 Hide unwanted GitHub Copilot models, enforce global allowlists, block by reasoning capability or context window size — all through a simple JSON config.
 
-> Fork de [pi-model-filter](https://github.com/clankercode/pi-model-filter) com fixes e features que não foram aceitos upstream.
-
 ## Install
 
 ```bash
@@ -127,17 +125,14 @@ make build      # tsc -p tsconfig.json -> dist/
 make clean      # remove dist/ and local caches
 ```
 
-Cutting a release:
+### Releases
 
-```bash
-make version VERSION=0.1.4   # bump package.json + lock, no commit, no tag
-git commit -am "release: v0.1.4"
-git push origin main
-make pack                    # optional: inspect the tarball
-make publish                 # prepublishOnly runs typecheck, test and build
-```
+Releases are automated with Release Please and npm trusted publishing:
 
-Publishing needs a live npm session. `make whoami` tells you which case you
-are in: if it answers with your username, `make publish` is enough and the
-browser that pops up is the 2FA prompt; if it fails with E401, run
-`make login` first.
+1. Conventional commits merged into `main` update the release PR.
+2. Merging that PR creates the version tag and GitHub Release.
+3. `.github/workflows/release.yaml` runs the full quality gate and publishes
+   the public package to npm through OIDC, without a stored npm token.
+
+Use `make pack` to inspect the package tarball locally. `make publish` remains
+available only as a manual fallback and runs the same pre-publish quality gate.
