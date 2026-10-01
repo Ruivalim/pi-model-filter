@@ -21,6 +21,12 @@
       "matchManagers": ["npm"],
       "matchDepTypes": ["peerDependencies"],
       "rangeStrategy": "widen"
+    },
+    {
+      "description": "Test against the newest Pi: the pinned dev copies move together in their own PR, the peer range stays as is",
+      "matchPackageNames": ["@earendil-works/**"],
+      "matchDepTypes": ["devDependencies"],
+      "groupName": "pi"
     }
   ]
 }
