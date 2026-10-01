@@ -6,7 +6,7 @@
     "group:allNonMajor"
   ],
   "timezone": "America/Sao_Paulo",
-  "schedule": ["before 6am on monday"],
+  "schedule": ["on monday"],
   "labels": ["dependencies"],
   "prConcurrentLimit": 5,
   "minimumReleaseAge": "3 days",
